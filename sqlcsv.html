@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV SQL Query App</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .upload-section {
+            border: 3px dashed #ddd;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-section:hover {
+            border-color: #4facfe;
+            background: rgba(79, 172, 254, 0.05);
+        }
+
+        .upload-section.dragover {
+            border-color: #4facfe;
+            background: rgba(79, 172, 254, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            color: #4facfe;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(79, 172, 254, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .query-section {
+            margin: 30px 0;
+        }
+
+        .query-section h3 {
+            margin-bottom: 15px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sql-textarea {
+            width: 100%;
+            height: 120px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+        }
+
+        .sql-textarea:focus {
+            outline: none;
+            border-color: #4facfe;
+        }
+
+        .quick-queries {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .quick-query-btn {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            color: #495057;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .quick-query-btn:hover {
+            background: #e9ecef;
+            border-color: #4facfe;
+            color: #4facfe;
+        }
+
+        .results-section {
+            margin-top: 30px;
+        }
+
+        .results-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        .results-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+
+        .results-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .results-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        .results-table tr:hover {
+            background: rgba(79, 172, 254, 0.05);
+        }
+
+        .error {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .success {
+            background: #51cf66;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .table-info {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .table-info h4 {
+            color: #0066cc;
+            margin-bottom: 10px;
+        }
+
+        .columns-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .column-tag {
+            background: #0066cc;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                padding: 20px;
+            }
+            
+            .quick-queries {
+                flex-direction: column;
+            }
+            
+            .results-info {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 CSV SQL Query App</h1>
+            <p>Import your CSV files and query them with SQL - No installation required!</p>
+        </div>
+        
+        <div class="content">
+            <!-- File Upload Section -->
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-icon">📁</div>
+                <h3>Import CSV File</h3>
+                <p>Click here or drag and drop your CSV file</p>
+                <input type="file" id="csvFile" class="file-input" accept=".csv" />
+                <br><br>
+                <button class="btn" onclick="document.getElementById('csvFile').click()">
+                    Choose File
+                </button>
+            </div>
+
+            <!-- Table Info -->
+            <div id="tableInfo" class="table-info" style="display: none;">
+                <h4>📋 Table Information</h4>
+                <p><strong>Rows:</strong> <span id="rowCount">0</span></p>
+                <p><strong>Columns:</strong></p>
+                <div id="columnsList" class="columns-list"></div>
+            </div>
+
+            <!-- SQL Query Section -->
+            <div class="query-section">
+                <h3>🔍 SQL Query</h3>
+                <textarea 
+                    id="sqlQuery" 
+                    class="sql-textarea" 
+                    placeholder="Enter your SQL query here...">SELECT * FROM csv_data LIMIT 10;</textarea>
+                
+                <div class="quick-queries">
+                    <button class="quick-query-btn" onclick="setQuery('SELECT * FROM csv_data LIMIT 10;')">
+                        View First 10 Rows
+                    </button>
+                    <button class="quick-query-btn" onclick="setQuery('SELECT COUNT(*) as total_rows FROM csv_data;')">
+                        Count Rows
+                    </button>
+                    <button class="quick-query-btn" onclick="setQuery('SELECT * FROM csv_data ORDER BY RANDOM() LIMIT 5;')">
+                        Random Sample
+                    </button>
+                </div>
+
+                <button id="executeBtn" class="btn" onclick="executeQuery()" disabled>
+                    <span id="executeText">Execute Query</span>
+                    <div id="executeLoader" class="loading" style="display: none;"></div>
+                </button>
+            </div>
+
+            <!-- Results Section -->
+            <div id="resultsSection" class="results-section" style="display: none;">
+                <div class="results-info">
+                    <h3>📈 Query Results</h3>
+                    <span id="resultCount">0 rows returned</span>
+                </div>
+                <div class="table-container">
+                    <table id="resultsTable" class="results-table">
+                        <thead id="resultsHeader"></thead>
+                        <tbody id="resultsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="errorMessage"></div>
+        </div>
+    </div>
+
+    <script>
+        let db = null;
+        let SQL = null;
+
+        // Initialize SQL.js
+        initSqlJs({
+            locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
+        }).then(sql => {
+            SQL = sql;
+            db = new SQL.Database();
+            console.log('SQL.js initialized');
+        });
+
+        // File upload handling
+        const uploadSection = document.getElementById('uploadSection');
+        const csvFile = document.getElementById('csvFile');
+
+        uploadSection.addEventListener('click', () => csvFile.click());
+        uploadSection.addEventListener('dragover', handleDragOver);
+        uploadSection.addEventListener('drop', handleDrop);
+        uploadSection.addEventListener('dragleave', handleDragLeave);
+        csvFile.addEventListener('change', handleFileSelect);
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                processFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                processFile(file);
+            }
+        }
+
+        function processFile(file) {
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                showError('Please select a CSV file.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const csv = e.target.result;
+                importCSV(csv, file.name);
+            };
+            reader.readAsText(file);
+        }
+
+        function importCSV(csvContent, filename) {
+            try {
+                // Parse CSV
+                const lines = csvContent.split('\n').filter(line => line.trim());
+                if (lines.length < 2) {
+                    showError('CSV file must have at least a header and one data row.');
+                    return;
+                }
+
+                // Parse header
+                const headers = parseCSVLine(lines[0]);
+                const dataRows = lines.slice(1).map(line => parseCSVLine(line));
+
+                // Clean headers (remove quotes, spaces)
+                const cleanHeaders = headers.map((h, i) => {
+                    let clean = h.replace(/[^a-zA-Z0-9_]/g, '_');
+                    return clean || `column_${i}`;
+                });
+
+                // Drop existing table
+                try {
+                    db.exec('DROP TABLE IF EXISTS csv_data');
+                } catch (e) {}
+
+                // Create table
+                const columnDefs = cleanHeaders.map(h => `"${h}" TEXT`).join(', ');
+                const createSQL = `CREATE TABLE csv_data (${columnDefs})`;
+                db.exec(createSQL);
+
+                // Insert data
+                const placeholders = cleanHeaders.map(() => '?').join(', ');
+                const insertSQL = `INSERT INTO csv_data VALUES (${placeholders})`;
+                const stmt = db.prepare(insertSQL);
+
+                dataRows.forEach(row => {
+                    // Pad or trim row to match header count
+                    const paddedRow = new Array(cleanHeaders.length);
+                    for (let i = 0; i < cleanHeaders.length; i++) {
+                        paddedRow[i] = (row[i] || '').toString();
+                    }
+                    stmt.run(paddedRow);
+                });
+
+                stmt.free();
+
+                // Show success and table info
+                showSuccess(`Successfully imported ${filename} with ${dataRows.length} rows and ${cleanHeaders.length} columns.`);
+                showTableInfo(dataRows.length, cleanHeaders);
+                document.getElementById('executeBtn').disabled = false;
+
+            } catch (error) {
+                console.error('Import error:', error);
+                showError(`Error importing CSV: ${error.message}`);
+            }
+        }
+
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '"') {
+                    if (inQuotes && line[i + 1] === '"') {
+                        current += '"';
+                        i++; // Skip next quote
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            result.push(current.trim());
+            return result;
+        }
+
+        function showTableInfo(rowCount, columns) {
+            document.getElementById('rowCount').textContent = rowCount;
+            const columnsList = document.getElementById('columnsList');
+            columnsList.innerHTML = columns.map(col => 
+                `<span class="column-tag">${col}</span>`
+            ).join('');
+            document.getElementById('tableInfo').style.display = 'block';
+        }
+
+        function setQuery(query) {
+            document.getElementById('sqlQuery').value = query;
+        }
+
+        function executeQuery() {
+            const query = document.getElementById('sqlQuery').value.trim();
+            if (!query) {
+                showError('Please enter a SQL query.');
+                return;
+            }
+
+            const executeBtn = document.getElementById('executeBtn');
+            const executeText = document.getElementById('executeText');
+            const executeLoader = document.getElementById('executeLoader');
+
+            executeBtn.disabled = true;
+            executeText.style.display = 'none';
+            executeLoader.style.display = 'block';
+
+            try {
+                const results = db.exec(query);
+                displayResults(results);
+                clearMessages();
+            } catch (error) {
+                console.error('Query error:', error);
+                showError(`SQL Error: ${error.message}`);
+            } finally {
+                executeBtn.disabled = false;
+                executeText.style.display = 'block';
+                executeLoader.style.display = 'none';
+            }
+        }
+
+        function displayResults(results) {
+            const resultsSection = document.getElementById('resultsSection');
+            const resultCount = document.getElementById('resultCount');
+            const resultsHeader = document.getElementById('resultsHeader');
+            const resultsBody = document.getElementById('resultsBody');
+
+            if (!results || results.length === 0) {
+                resultCount.textContent = 'Query executed successfully (no results returned)';
+                resultsHeader.innerHTML = '';
+                resultsBody.innerHTML = '';
+                resultsSection.style.display = 'block';
+                return;
+            }
+
+            const result = results[0];
+            const columns = result.columns;
+            const values = result.values;
+
+            resultCount.textContent = `${values.length} rows returned`;
+
+            // Create header
+            resultsHeader.innerHTML = '<tr>' + 
+                columns.map(col => `<th>${col}</th>`).join('') + 
+                '</tr>';
+
+            // Create body
+            resultsBody.innerHTML = values.map(row => 
+                '<tr>' + row.map(cell => 
+                    `<td>${cell !== null ? String(cell) : ''}</td>`
+                ).join('') + '</tr>'
+            ).join('');
+
+            resultsSection.style.display = 'block';
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.innerHTML = `<div class="error">❌ ${message}</div>`;
+        }
+
+        function showSuccess(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.innerHTML = `<div class="success">✅ ${message}</div>`;
+        }
+
+        function clearMessages() {
+            document.getElementById('errorMessage').innerHTML = '';
+        }
+
+        // Allow Enter to execute query (Ctrl+Enter)
+        document.getElementById('sqlQuery').addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                executeQuery();
+            }
+        });
+    </script>
+</body>
+</html>
